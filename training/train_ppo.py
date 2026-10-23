@@ -7,6 +7,7 @@ from stable_baselines3.common.monitor import Monitor
 
 from environment.geometry_env import GeometrySurvivorEnv
 from training.reward_shaping import PotentialSafetyReward
+from training.danger_features import DangerFeatures
 
 
 def main():
@@ -16,6 +17,7 @@ def main():
     parser.add_argument("--output", type=Path, default=Path("models/ppo_geometry"))
     parser.add_argument("--reward-mode", choices=("survival", "potential"), default="survival")
     parser.add_argument("--potential-scale", type=float, default=0.5)
+    parser.add_argument("--danger-features", action="store_true", help="Append four observation-only danger features")
     args = parser.parse_args()
     if args.steps < 1:
         parser.error("--steps must be positive")
@@ -23,6 +25,8 @@ def main():
     env = GeometrySurvivorEnv()
     if args.reward_mode == 'potential':
         env = PotentialSafetyReward(env, scale=args.potential_scale)
+    if args.danger_features:
+        env = DangerFeatures(env)
     env = Monitor(env)
     model = PPO(
         "MlpPolicy", env, seed=args.seed, verbose=1,
