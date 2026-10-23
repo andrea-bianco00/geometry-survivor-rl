@@ -21,6 +21,15 @@ on:
         options:
           - '50'
           - '100'
+      evaluation_seed_start:
+        description: 'Fresh held-out seed range; use 2000000 for the next experiment'
+        required: true
+        default: '2000000'
+        type: choice
+        options:
+          - '2000000'
+          - '3000000'
+          - '4000000'
       training_seed:
         description: 'PPO training seed'
         required: true
@@ -59,13 +68,13 @@ jobs:
           GEOMETRY_TS_CORE: ${{ github.workspace }}/canonical-portfolio/app/lib/geometry-core.ts
         run: python -m pytest -q
       - name: Evaluate reproducible random baseline
-        run: python -m evaluation.evaluate --seeds ${{ inputs.evaluation_seeds }} --seed-start 1000000 --output results/random.csv
+        run: python -m evaluation.evaluate --seeds ${{ inputs.evaluation_seeds }} --seed-start ${{ inputs.evaluation_seed_start }} --output results/random.csv
       - name: Evaluate transparent heuristic baseline
-        run: python -m evaluation.evaluate --heuristic --seeds ${{ inputs.evaluation_seeds }} --seed-start 1000000 --output results/heuristic.csv
+        run: python -m evaluation.evaluate --heuristic --seeds ${{ inputs.evaluation_seeds }} --seed-start ${{ inputs.evaluation_seed_start }} --output results/heuristic.csv
       - name: Train actual PPO policy
         run: python -m training.train_ppo --steps ${{ inputs.timesteps }} --seed ${{ inputs.training_seed }} --output models/ppo_geometry
       - name: Evaluate trained PPO on identical held-out seeds
-        run: python -m evaluation.evaluate --model models/ppo_geometry.zip --seeds ${{ inputs.evaluation_seeds }} --seed-start 1000000 --output results/ppo.csv
+        run: python -m evaluation.evaluate --model models/ppo_geometry.zip --seeds ${{ inputs.evaluation_seeds }} --seed-start ${{ inputs.evaluation_seed_start }} --output results/ppo.csv
       - name: Summarize experiment with honest comparisons
         run: python -m evaluation.summarize --random results/random.csv --heuristic results/heuristic.csv --ppo results/ppo.csv --output results/summary.md
       - name: Publish experiment summary in run
