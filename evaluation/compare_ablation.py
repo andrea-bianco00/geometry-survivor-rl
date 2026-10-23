@@ -21,6 +21,7 @@ def main():
     for name in ("control", "treatment", "heuristic", "random"):
         parser.add_argument("--" + name, required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--experiment", choices=("reward", "observations"), default="reward")
     args = parser.parse_args()
     results = {name: read(getattr(args, name)) for name in ("control", "treatment", "heuristic", "random")}
     seeds = results["control"][0]
@@ -29,11 +30,18 @@ def main():
     control = results["control"][1]
     treatment = results["treatment"][1]
     differences = treatment - control
+    title = ("Controlled observation-feature ablation" if args.experiment == "observations"
+             else "Controlled reward-shaping ablation")
+    shared = ("Identical game physics, action space, training reward and survival-time scoring."
+              if args.experiment == "observations" else
+              "Identical game physics, action space, observation representation and survival-time scoring.")
+    difference_label = ("danger features minus original observations" if args.experiment == "observations"
+                        else "potential minus survival")
     lines = [
-        "# Controlled reward-shaping ablation",
+        "# " + title,
         "",
         f"**{len(seeds)} paired evaluation seeds**, {min(seeds)}–{max(seeds)}. "
-        "Identical game physics, action space, observation representation and survival-time scoring.",
+        shared,
         "",
         "| Agent | Mean survival (s) | Median (s) | P90 (s) |",
         "|---|---:|---:|---:|",
@@ -42,7 +50,7 @@ def main():
         lines.append(f"| {name} | {seconds.mean():.3f} | {np.median(seconds):.3f} | {np.percentile(seconds,90):.3f} |")
     lines.extend([
         "",
-        f"**Paired mean difference** (potential minus survival): {differences.mean():+.3f} seconds.",
+        f"**Paired mean difference** ({difference_label}): {differences.mean():+.3f} seconds.",
         f"**Fraction of seeds improved**: {np.mean(differences > 0):.1%}; "
         f"tied: {np.mean(differences == 0):.1%}.",
         "",
