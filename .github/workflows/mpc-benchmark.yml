@@ -1,0 +1,61 @@
+name: MPC observation-only benchmark
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: andrea-bianco00/andrea-portfolio
+          path: canonical-portfolio
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install -r requirements.txt
+      - name: Run all parity and controller tests
+        env:
+          GEOMETRY_TS_CORE: ${{ github.workspace }}/canonical-portfolio/app/lib/geometry-core.ts
+        run: python -m pytest -q
+      - name: Compare observation-only agents on identical seeds
+        run: |
+          mkdir -p results/mpc
+          python - <<'PY'
+          import csv
+          from pathlib import Path
+          from statistics import mean,median
+          from evaluation.evaluate import evaluate
+          from evaluation.mpc import MPCPolicy
+          from evaluation.heuristic import ClosestApproachBaseline
+          seeds=range(4200000,4200100)
+          lines=["# Observation-only MPC benchmark (exploratory)", "", "All agents use the same 100 seeds; 120-second cap; 20 decisions/second.", "MPC uses only the 53-element observation, predicts constant-velocity visible enemies, and never sees future spawns.", "", "| Agent | Mean (s) | Median (s) |", "|---|---:|---:|"]
+          for name,policy in [("random",None),("heuristic",ClosestApproachBaseline()),("mpc",MPCPolicy())]:
+              rows=evaluate(policy,seeds)
+              with open(f"results/mpc/{name}.csv","w",newline="") as f:
+                  w=csv.DictWriter(f,fieldnames=rows[0]);w.writeheader();w.writerows(rows)
+              vals=[r["seconds"] for r in rows]
+              lines.append(f"| {name} | {mean(vals):.3f} | {median(vals):.3f} |")
+          lines += ["", "This is a hand-designed planning controller, not reinforcement learning. Results are exploratory, not a final untouched test."]
+          report="\n".join(lines)+"\n"
+          Path("results/mpc/report.md").write_text(report)
+          print(report)
+          with open(__import__("os").environ["GITHUB_STEP_SUMMARY"],"a") as f:f.write(report)
+          PY
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpc-benchmark-${{ github.run_id }}
+          path: results/mpc/
+          if-no-files-found: warn
+          retention-days: 30
