@@ -72,3 +72,11 @@ MIT (see LICENSE).
 4. Download the run's `ppo-pilot-<run-id>` artifact for the trained model (`.zip`), per-episode CSV files and Markdown summary. Artifacts are retained for 30 days; they are not automatically committed to the repository.
 
 **Scientific caution:** 30,000 steps is a *smoke-test/pilot*, not evidence of a good policy. If PPO underperforms, report that honestly and improve training. The job reruns the simulator parity suite before training. This workflow is manually triggered to avoid consuming GitHub Actions minutes on every commit.
+
+## Experimental protocol after the 30k pilot
+
+The first 30k-step run used evaluation seeds 1000000–1000049. It is a *pilot*, and the results were inspected before selecting the next training budget. **Do not treat those same seeds as an untouched test set for model selection.**
+
+For the next diagnostic run, use **300000 training steps, seed 42, 100 evaluation seeds, evaluation seed start 2000000**. Compare the 30k and 300k results cautiously because the evaluation seed sets differ; rerun both checkpoints on one common untouched seed set for a strictly paired comparison. Reserve an additional independent range (e.g. 4000000+) for final reporting after all hyperparameters are frozen.
+
+The heuristic is a non-learning baseline, not the deployed RL agent. A single training seed does not establish stability: eventually run at least three training seeds and report variability. Do not claim statistical significance from a single run.
