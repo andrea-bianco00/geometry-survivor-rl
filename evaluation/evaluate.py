@@ -15,7 +15,7 @@ def evaluate(policy, seeds, max_seconds=120):
         done = False
         while not done:
             if policy is None:
-                action = int(env.action_space.sample())
+                action = int(rng.integers(env.action_space.n))
             else:
                 action, _ = policy.predict(obs, deterministic=True)
                 action = int(action)
