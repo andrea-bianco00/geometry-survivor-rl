@@ -1,4 +1,4 @@
-name: Python checks
+name: Python and TypeScript parity
 on:
   push:
   pull_request:
@@ -6,9 +6,25 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout RL repository
+        uses: actions/checkout@v4
+      - name: Checkout canonical portfolio simulator
+        uses: actions/checkout@v4
+        with:
+          repository: andrea-bianco00/andrea-portfolio
+          path: canonical-portfolio
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install environment test dependencies
+        run: python -m pip install 'gymnasium>=1.0,<2' 'numpy>=1.26,<3' 'pytest>=8,<10'
       - name: Syntax check
         run: python -m compileall -q environment training evaluation tests
+      - name: Unit and simulator parity tests
+        env:
+          GEOMETRY_TS_CORE: ${{ github.workspace }}/canonical-portfolio/app/lib/geometry-core.ts
+        run: python -m pytest -q
