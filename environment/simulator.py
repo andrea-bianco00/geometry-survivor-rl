@@ -111,9 +111,9 @@ def update(g: Game, dt: float, ax: float, ay: float) -> None:
             g.near_count += 1
         if (g.x - e.x) ** 2 + (g.y - e.y) ** 2 < contact ** 2:
             g.dead = True
-            # TypeScript generates 76 random draws for death particles.
+            # TypeScript generates 114 random draws for death particles.
             # These affect the seed even though particles are visual-only.
-            for _ in range(76):
+            for _ in range(114):
                 _rand(g)
             break
 
