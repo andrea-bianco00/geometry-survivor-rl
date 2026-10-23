@@ -12,8 +12,9 @@ def wall_potential(obs):
     x = (float(obs[0]) + 1.0) * (W / 2)
     y = (float(obs[1]) + 1.0) * (H / 2)
     # Player center must remain at least PLAYER_R from the arena boundary.
-    margin = min(x - PLAYER_R, W - 11.0 - x,
-                 y - 11.0, H - 11.0 - y)
+    boundary = PLAYER_R + 5.0
+    margin = min(x - boundary, W - boundary - x,
+                 y - boundary, H - boundary - y)
     # A smooth bounded negative potential: ~0 at safe distances.
     return -math.exp(-max(0.0, margin) / 45.0)
 
