@@ -71,8 +71,10 @@ jobs:
         run: python -m evaluation.evaluate --seeds ${{ inputs.evaluation_seeds }} --seed-start ${{ inputs.evaluation_seed_start }} --output results/random.csv
       - name: Evaluate transparent heuristic baseline
         run: python -m evaluation.evaluate --heuristic --seeds ${{ inputs.evaluation_seeds }} --seed-start ${{ inputs.evaluation_seed_start }} --output results/heuristic.csv
+      # Diagnostics only: evaluation seeds are reused across prior experiments,
+      # so do not describe this run as an untouched final generalization test.
       - name: Train actual PPO policy
-        run: python -m training.train_ppo --steps ${{ inputs.timesteps }} --seed ${{ inputs.training_seed }} --output models/ppo_geometry
+        run: python -m training.train_ppo --steps ${{ inputs.timesteps }} --seed ${{ inputs.training_seed }} --output models/ppo_geometry --log-dir results/training
       - name: Evaluate trained PPO on identical held-out seeds
         run: python -m evaluation.evaluate --model models/ppo_geometry.zip --seeds ${{ inputs.evaluation_seeds }} --seed-start ${{ inputs.evaluation_seed_start }} --output results/ppo.csv
       - name: Summarize experiment with honest comparisons
@@ -88,5 +90,6 @@ jobs:
             models/*.zip
             results/*.csv
             results/*.md
+            results/training/
           if-no-files-found: warn
           retention-days: 30
