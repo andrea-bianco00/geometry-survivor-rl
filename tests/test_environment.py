@@ -24,7 +24,7 @@ def test_same_seed_and_actions_reproduce_exactly():
         ax, ay = ACTIONS[(step // 6) % len(ACTIONS)]
         update(a, STEP, ax, ay)
         update(b, STEP, ax, ay)
-        assert a == b
+        assert (a.seed, a.x, a.y, a.vx, a.vy, a.t, a.score, a.spawn, a.dead, a.near_count) == (b.seed, b.x, b.y, b.vx, b.vy, b.t, b.score, b.spawn, b.dead, b.near_count)\n        assert a.enemies == b.enemies
         if a.dead:
             break
 
