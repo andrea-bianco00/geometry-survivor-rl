@@ -12,6 +12,7 @@ def evaluate(policy, seeds, max_seconds=120):
     rows = []
     for seed in seeds:
         obs, _ = env.reset(seed=int(seed))
+        rng = np.random.default_rng(int(seed) ^ 0xA51C)
         done = False
         while not done:
             if policy is None:
