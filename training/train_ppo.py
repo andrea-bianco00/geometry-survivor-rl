@@ -4,6 +4,7 @@ from pathlib import Path
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.logger import configure
 
 from environment.geometry_env import GeometrySurvivorEnv
 from training.reward_shaping import PotentialSafetyReward
@@ -16,6 +17,7 @@ def main():
     parser.add_argument("--steps", type=int, default=100_000)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output", type=Path, default=Path("models/ppo_geometry"))
+    parser.add_argument("--log-dir", type=Path, default=None, help="Optional directory for PPO progress.csv and raw episode Monitor logs")
     parser.add_argument("--reward-mode", choices=("survival", "potential"), default="survival")
     parser.add_argument("--potential-scale", type=float, default=0.5)
     parser.add_argument("--danger-features", action="store_true", help="Append four observation-only danger features")
@@ -33,11 +35,17 @@ def main():
         env = PotentialWallReward(env, scale=args.wall_scale)
     if args.danger_features:
         env = DangerFeatures(env)
-    env = Monitor(env)
+    if args.log_dir is not None:
+        args.log_dir.mkdir(parents=True, exist_ok=True)
+        env = Monitor(env, filename=str(args.log_dir / 'episodes.csv'))
+    else:
+        env = Monitor(env)
     model = PPO(
         "MlpPolicy", env, seed=args.seed, verbose=1,
         tensorboard_log=None, device="cpu",
     )
+    if args.log_dir is not None:
+        model.set_logger(configure(str(args.log_dir), ['stdout', 'csv']))
     model.learn(total_timesteps=args.steps)
     model.save(str(args.output))
     print(f'Training reward mode: {args.reward_mode}; potential scale: {args.potential_scale}')
