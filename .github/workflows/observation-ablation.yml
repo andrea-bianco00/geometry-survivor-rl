@@ -1,0 +1,74 @@
+name: PPO observation ablation
+
+on:
+  workflow_dispatch:
+    inputs:
+      timesteps:
+        description: 'Equal training steps per model'
+        required: true
+        default: '100000'
+        type: choice
+        options:
+          - '100000'
+          - '300000'
+      training_seed:
+        description: 'Identical training seed'
+        required: true
+        default: '42'
+        type: choice
+        options:
+          - '42'
+          - '123'
+          - '2026'
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: andrea-bianco00/andrea-portfolio
+          path: canonical-portfolio
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install -r requirements.txt
+      - name: Verify game parity and feature isolation
+        env:
+          GEOMETRY_TS_CORE: ${{ github.workspace }}/canonical-portfolio/app/lib/geometry-core.ts
+        run: python -m pytest -q
+      - name: Train baseline PPO with original observations and shaped reward
+        run: python -m training.train_ppo --steps ${{ inputs.timesteps }} --seed ${{ inputs.training_seed }} --reward-mode potential --output models/ppo_original_observations
+      - name: Train PPO with derived danger observations and identical reward
+        run: python -m training.train_ppo --steps ${{ inputs.timesteps }} --seed ${{ inputs.training_seed }} --reward-mode potential --danger-features --output models/ppo_danger_observations
+      - name: Evaluate original PPO on paired game seeds
+        run: python -m evaluation.evaluate --model models/ppo_original_observations.zip --seeds 100 --seed-start 3600000 --output results/ppo_original.csv
+      - name: Evaluate danger-feature PPO on paired game seeds
+        run: python -m evaluation.evaluate --model models/ppo_danger_observations.zip --seeds 100 --seed-start 3600000 --output results/ppo_danger.csv
+      - name: Evaluate heuristic on paired game seeds
+        run: python -m evaluation.evaluate --heuristic --seeds 100 --seed-start 3600000 --output results/heuristic.csv
+      - name: Evaluate random on paired game seeds
+        run: python -m evaluation.evaluate --seeds 100 --seed-start 3600000 --output results/random.csv
+      - name: Report measured paired differences
+        run: python -m evaluation.compare_ablation --control results/ppo_original.csv --treatment results/ppo_danger.csv --heuristic results/heuristic.csv --random results/random.csv --output results/observation_ablation.md
+      - run: cat results/observation_ablation.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Save both models and all raw results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: observation-ablation-${{ github.run_id }}
+          path: |
+            models/*.zip
+            results/*.csv
+            results/*.md
+          if-no-files-found: warn
+          retention-days: 30
