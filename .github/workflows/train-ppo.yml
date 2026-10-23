@@ -1,0 +1,83 @@
+name: PPO pilot experiment
+
+# Explicitly launched: this job consumes compute and produces REAL metrics.
+on:
+  workflow_dispatch:
+    inputs:
+      timesteps:
+        description: 'PPO training timesteps (pilot: 30000; later: 300000+)'
+        required: true
+        default: '30000'
+        type: choice
+        options:
+          - '30000'
+          - '100000'
+          - '300000'
+      evaluation_seeds:
+        description: 'Number of held-out evaluation game seeds'
+        required: true
+        default: '50'
+        type: choice
+        options:
+          - '50'
+          - '100'
+      training_seed:
+        description: 'PPO training seed'
+        required: true
+        default: '42'
+        type: choice
+        options:
+          - '42'
+          - '123'
+          - '2026'
+
+permissions:
+  contents: read
+
+jobs:
+  train-and-evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out canonical game for parity
+        uses: actions/checkout@v4
+        with:
+          repository: andrea-bianco00/andrea-portfolio
+          path: canonical-portfolio
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned-compatible training dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Validate simulator and observation contract
+        env:
+          GEOMETRY_TS_CORE: ${{ github.workspace }}/canonical-portfolio/app/lib/geometry-core.ts
+        run: python -m pytest -q
+      - name: Evaluate reproducible random baseline
+        run: python -m evaluation.evaluate --seeds ${{ inputs.evaluation_seeds }} --seed-start 1000000 --output results/random.csv
+      - name: Evaluate transparent heuristic baseline
+        run: python -m evaluation.evaluate --heuristic --seeds ${{ inputs.evaluation_seeds }} --seed-start 1000000 --output results/heuristic.csv
+      - name: Train actual PPO policy
+        run: python -m training.train_ppo --steps ${{ inputs.timesteps }} --seed ${{ inputs.training_seed }} --output models/ppo_geometry
+      - name: Evaluate trained PPO on identical held-out seeds
+        run: python -m evaluation.evaluate --model models/ppo_geometry.zip --seeds ${{ inputs.evaluation_seeds }} --seed-start 1000000 --output results/ppo.csv
+      - name: Summarize experiment with honest comparisons
+        run: python -m evaluation.summarize --random results/random.csv --heuristic results/heuristic.csv --ppo results/ppo.csv --output results/summary.md
+      - name: Publish experiment summary in run
+        run: cat results/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Save model, raw evaluation rows and summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ppo-pilot-${{ github.run_id }}
+          path: |
+            models/*.zip
+            results/*.csv
+            results/*.md
+          if-no-files-found: warn
+          retention-days: 30
