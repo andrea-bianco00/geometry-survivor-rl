@@ -1,0 +1,61 @@
+name: Diagnose saved PPO behavior
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: 'Successful observation ablation run with saved models'
+        required: true
+        default: '40003764920'
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: andrea-bianco00/andrea-portfolio
+          path: canonical-portfolio
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install -r requirements.txt
+      - name: Check simulator parity and tests
+        env:
+          GEOMETRY_TS_CORE: ${{ github.workspace }}/canonical-portfolio/app/lib/geometry-core.ts
+        run: python -m pytest -q
+      - name: Retrieve saved real checkpoints from prior experiment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ inputs.source_run_id }}
+        run: |
+          mkdir -p source-artifact
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --dir source-artifact
+          find source-artifact -type f -name '*.zip' -print
+          test "$(find source-artifact -name '*.zip' | wc -l)" -ge 2
+      - name: Diagnose original and enriched PPO without retraining
+        run: |
+          ORIGINAL=$(find source-artifact -type f -name 'ppo_original_observations.zip' -print -quit)
+          ENRICHED=$(find source-artifact -type f -name 'ppo_danger_observations.zip' -print -quit)
+          test -n "$ORIGINAL" && test -n "$ENRICHED"
+          python -m evaluation.behavior_diagnosis --original "$ORIGINAL" --enriched "$ENRICHED" --seeds 100 --seed-start 3700000 --output results/behavior
+      - name: Publish actual measurements
+        run: cat results/behavior/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: behavior-diagnosis-${{ github.run_id }}
+          path: results/behavior/
+          if-no-files-found: warn
+          retention-days: 30
