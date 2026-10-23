@@ -1,0 +1,75 @@
+name: Controlled PPO reward ablation
+
+on:
+  workflow_dispatch:
+    inputs:
+      timesteps:
+        description: 'Equal training steps for both PPO models'
+        type: choice
+        required: true
+        default: '100000'
+        options:
+          - '100000'
+          - '300000'
+      training_seed:
+        description: 'Identical PPO training seed for both models'
+        type: choice
+        required: true
+        default: '42'
+        options:
+          - '42'
+          - '123'
+          - '2026'
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: andrea-bianco00/andrea-portfolio
+          path: canonical-portfolio
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install -r requirements.txt
+      - name: Validate physics and reward isolation
+        env:
+          GEOMETRY_TS_CORE: ${{ github.workspace }}/canonical-portfolio/app/lib/geometry-core.ts
+        run: python -m pytest -q
+      - name: Train unchanged survival-only PPO control
+        run: python -m training.train_ppo --steps ${{ inputs.timesteps }} --seed ${{ inputs.training_seed }} --reward-mode survival --output models/ppo_survival
+      - name: Train potential-shaped PPO treatment
+        run: python -m training.train_ppo --steps ${{ inputs.timesteps }} --seed ${{ inputs.training_seed }} --reward-mode potential --potential-scale 0.5 --output models/ppo_potential
+      - name: Evaluate survival-only control on identical game seeds
+        run: python -m evaluation.evaluate --model models/ppo_survival.zip --seeds 100 --seed-start 3500000 --output results/ppo_survival.csv
+      - name: Evaluate shaped PPO on identical game seeds
+        run: python -m evaluation.evaluate --model models/ppo_potential.zip --seeds 100 --seed-start 3500000 --output results/ppo_potential.csv
+      - name: Evaluate heuristic baseline on identical game seeds
+        run: python -m evaluation.evaluate --heuristic --seeds 100 --seed-start 3500000 --output results/heuristic.csv
+      - name: Evaluate random baseline on identical game seeds
+        run: python -m evaluation.evaluate --seeds 100 --seed-start 3500000 --output results/random.csv
+      - name: Compare control, treatment, and heuristic
+        run: python -m evaluation.compare_ablation --control results/ppo_survival.csv --treatment results/ppo_potential.csv --heuristic results/heuristic.csv --random results/random.csv --output results/ablation.md
+      - name: Publish measured comparison
+        run: cat results/ablation.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Save both real checkpoints and raw measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reward-ablation-${{ github.run_id }}
+          path: |
+            models/*.zip
+            results/*.csv
+            results/*.md
+          if-no-files-found: warn
+          retention-days: 30
