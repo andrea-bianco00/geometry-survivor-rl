@@ -5,10 +5,17 @@ from pathlib import Path
 
 import numpy as np
 from environment.geometry_env import GeometrySurvivorEnv
+from training.danger_features import DangerFeatures
 
 
 def evaluate(policy, seeds, max_seconds=120):
     env = GeometrySurvivorEnv(max_seconds=max_seconds)
+    if policy is not None and hasattr(policy, 'observation_space'):
+        expected = policy.observation_space.shape[0]
+        if expected == env.observation_space.shape[0] + 4:
+            env = DangerFeatures(env)
+        elif expected != env.observation_space.shape[0]:
+            raise ValueError(f'Unsupported policy observation size: {expected}')
     rows = []
     for seed in seeds:
         obs, _ = env.reset(seed=int(seed))
