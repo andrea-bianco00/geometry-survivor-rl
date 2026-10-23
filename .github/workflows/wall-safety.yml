@@ -41,8 +41,8 @@ jobs:
         run: |
           mkdir -p models results/wall
           for SEED in 42 123 2026; do
-            python -m training.train_ppo --steps ${{ inputs.timesteps }} --seed "$SEED" --reward-mode potential --output "models/control_$SEED"
-            python -m training.train_ppo --steps ${{ inputs.timesteps }} --seed "$SEED" --reward-mode potential --wall-scale 0.2 --output "models/wall_$SEED"
+            python -m training.train_ppo --steps ${{ inputs.timesteps }} --seed "$SEED" --reward-mode potential --output "models/control_$SEED" --log-dir "results/wall/training_control_$SEED"
+            python -m training.train_ppo --steps ${{ inputs.timesteps }} --seed "$SEED" --reward-mode potential --wall-scale 0.2 --output "models/wall_$SEED" --log-dir "results/wall/training_wall_$SEED"
             python -m evaluation.evaluate --model "models/control_$SEED.zip" --seeds 100 --seed-start 3800000 --output "results/wall/control_$SEED.csv"
             python -m evaluation.evaluate --model "models/wall_$SEED.zip" --seeds 100 --seed-start 3800000 --output "results/wall/wall_$SEED.csv"
           done
