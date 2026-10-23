@@ -1,0 +1,62 @@
+name: PPO wall-safety experiment
+
+on:
+  workflow_dispatch:
+    inputs:
+      timesteps:
+        description: 'Same training steps for each model (six models total)'
+        required: true
+        default: '100000'
+        type: choice
+        options:
+          - '100000'
+          - '300000'
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: andrea-bianco00/andrea-portfolio
+          path: canonical-portfolio
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install -r requirements.txt
+      - name: Verify parity, reward isolation and regression tests
+        env:
+          GEOMETRY_TS_CORE: ${{ github.workspace }}/canonical-portfolio/app/lib/geometry-core.ts
+        run: python -m pytest -q
+      - name: Train and evaluate three paired independent seeds
+        run: |
+          mkdir -p models results/wall
+          for SEED in 42 123 2026; do
+            python -m training.train_ppo --steps ${{ inputs.timesteps }} --seed "$SEED" --reward-mode potential --output "models/control_$SEED"
+            python -m training.train_ppo --steps ${{ inputs.timesteps }} --seed "$SEED" --reward-mode potential --wall-scale 0.2 --output "models/wall_$SEED"
+            python -m evaluation.evaluate --model "models/control_$SEED.zip" --seeds 100 --seed-start 3800000 --output "results/wall/control_$SEED.csv"
+            python -m evaluation.evaluate --model "models/wall_$SEED.zip" --seeds 100 --seed-start 3800000 --output "results/wall/wall_$SEED.csv"
+          done
+      - name: Summarize paired effects across training seeds
+        run: |
+          python -m evaluation.compare_wall --dir results/wall --seeds 42 123 2026
+          cat results/wall/report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve trained models and raw measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wall-safety-experiment-${{ github.run_id }}
+          path: |
+            models/*.zip
+            results/wall/
+          if-no-files-found: warn
+          retention-days: 30
