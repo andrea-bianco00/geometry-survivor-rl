@@ -1,0 +1,64 @@
+name: PPO diagnostic experiment
+
+on:
+  workflow_dispatch:
+    inputs:
+      training_steps:
+        description: 'Training budget for a diagnostic run'
+        required: true
+        type: choice
+        default: '100000'
+        options:
+          - '30000'
+          - '100000'
+          - '300000'
+      training_seed:
+        description: 'Training seed'
+        required: true
+        type: choice
+        default: '42'
+        options:
+          - '42'
+          - '123'
+          - '2026'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: andrea-bianco00/andrea-portfolio
+          path: canonical-portfolio
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install -r requirements.txt
+      - name: Verify physics parity and unit tests
+        env:
+          GEOMETRY_TS_CORE: ${{ github.workspace }}/canonical-portfolio/app/lib/geometry-core.ts
+        run: python -m pytest -q
+      - name: Train baseline PPO without changing reward or observations
+        run: python -m training.train_ppo --steps ${{ inputs.training_steps }} --seed ${{ inputs.training_seed }} --output models/ppo_diagnostic
+      - name: Inspect action distribution on diagnostic seeds
+        run: python -m evaluation.diagnose_policy --model models/ppo_diagnostic.zip --seeds 100 --seed-start 3000000 --output results/ppo_diagnostics.csv
+      - name: Save measured diagnostics and model
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ppo-diagnostics-${{ github.run_id }}
+          path: |
+            models/*.zip
+            results/*.csv
+            results/*.json
+          if-no-files-found: warn
+          retention-days: 30
