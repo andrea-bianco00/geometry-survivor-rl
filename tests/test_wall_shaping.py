@@ -31,3 +31,13 @@ def test_wall_shaping_preserves_physics_observations_and_raw_reward():
             break
     base.close()
     shaped.close()
+
+
+def test_wall_potential_is_symmetric_across_arena_edges():
+    center = np.zeros(53, dtype=np.float32)
+    for axis in (0, 1):
+        low = center.copy()
+        high = center.copy()
+        low[axis] = -0.95
+        high[axis] = 0.95
+        assert math.isclose(wall_potential(low), wall_potential(high), abs_tol=1e-6)
