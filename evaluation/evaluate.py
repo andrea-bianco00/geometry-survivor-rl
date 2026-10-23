@@ -31,13 +31,19 @@ def evaluate(policy, seeds, max_seconds=120):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=Path, default=None)
+    parser.add_argument("--heuristic", action="store_true", help="Evaluate non-learning heuristic baseline")
     parser.add_argument("--seeds", type=int, default=100)
     parser.add_argument("--seed-start", type=int, default=1_000_000)
     parser.add_argument("--output", type=Path, default=Path("results/evaluation.csv"))
     args = parser.parse_args()
     if args.seeds < 1:
         parser.error("--seeds must be positive")
+    if args.heuristic and args.model is not None:
+        parser.error('--heuristic and --model are mutually exclusive')
     policy = None
+    if args.heuristic:
+        from evaluation.heuristic import ClosestApproachBaseline
+        policy = ClosestApproachBaseline()
     if args.model is not None:
         from stable_baselines3 import PPO
         policy = PPO.load(str(args.model), device="cpu")
