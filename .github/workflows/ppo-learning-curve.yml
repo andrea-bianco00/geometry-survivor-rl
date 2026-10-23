@@ -1,0 +1,62 @@
+name: PPO continuous learning curve
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  learning-curve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: andrea-bianco00/andrea-portfolio
+          path: canonical-portfolio
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install -r requirements.txt
+      - name: Validate environment and parity
+        env:
+          GEOMETRY_TS_CORE: ${{ github.workspace }}/canonical-portfolio/app/lib/geometry-core.ts
+        run: python -m pytest -q
+      - name: Train one continuous baseline PPO and save predetermined checkpoints
+        run: python -m training.learning_curve --seed 42 --steps 300000 --output-dir results/learning_curve
+      - name: Evaluate all checkpoints on identical diagnostic seeds
+        run: |
+          for STEPS in 100000 200000 300000; do
+            python -m evaluation.evaluate --model "results/learning_curve/ppo_${STEPS}.zip" --seeds 100 --seed-start 4100000 --output "results/learning_curve/eval_${STEPS}.csv"
+          done
+      - name: Report every checkpoint without selecting a winner
+        run: |
+          python - <<'PY'
+          import csv
+          import statistics
+          from pathlib import Path
+          lines = ["# Continuous PPO learning curve (exploratory)", "", "One continuous PPO run; baseline survival reward; seed 42; 100 identical evaluation seeds 4100000–4100099.", "", "Checkpoints are saved at the first environment step reaching the specified threshold. No checkpoint selection.", "", "| Requested checkpoint | Mean survival (s) | Median survival (s) |", "|---|---:|---:|"]
+          for step in (100000, 200000, 300000):
+              with open(f"results/learning_curve/eval_{step}.csv", newline="") as f:
+                  values = [float(row["seconds"]) for row in csv.DictReader(f)]
+              lines.append(f"| {step} | {statistics.mean(values):.3f} | {statistics.median(values):.3f} |")
+          lines += ["", "Diagnostic seeds are used for analysis, not an untouched final test. One training seed does not establish generalization."]
+          report = "\n".join(lines) + "\n"
+          Path("results/learning_curve/report.md").write_text(report)
+          print(report)
+          PY
+          cat results/learning_curve/report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve checkpoints and raw diagnostics even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ppo-learning-curve-${{ github.run_id }}
+          path: results/learning_curve/
+          if-no-files-found: warn
+          retention-days: 30
