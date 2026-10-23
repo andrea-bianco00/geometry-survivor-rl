@@ -59,7 +59,7 @@ jobs:
       - name: Evaluate random on paired game seeds
         run: python -m evaluation.evaluate --seeds 100 --seed-start 3600000 --output results/random.csv
       - name: Report measured paired differences
-        run: python -m evaluation.compare_ablation --control results/ppo_original.csv --treatment results/ppo_danger.csv --heuristic results/heuristic.csv --random results/random.csv --output results/observation_ablation.md
+        run: python -m evaluation.compare_ablation --control results/ppo_original.csv --treatment results/ppo_danger.csv --heuristic results/heuristic.csv --random results/random.csv --experiment observations --output results/observation_ablation.md
       - run: cat results/observation_ablation.md >> "$GITHUB_STEP_SUMMARY"
       - name: Save both models and all raw results
         if: always()
