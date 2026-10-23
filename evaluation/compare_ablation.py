@@ -40,8 +40,7 @@ def main():
     lines = [
         "# " + title,
         "",
-        f"**{len(seeds)} paired evaluation seeds**, {min(seeds)}–{max(seeds)}. "
-        shared,
+        f"**{len(seeds)} paired evaluation seeds**, {min(seeds)}–{max(seeds)}. " + shared,
         "",
         "| Agent | Mean survival (s) | Median (s) | P90 (s) |",
         "|---|---:|---:|---:|",
