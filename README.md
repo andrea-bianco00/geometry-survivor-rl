@@ -63,3 +63,12 @@ Game physics runs at 120 Hz. One policy action is held for six physics ticks (20
 ## License
 
 MIT (see LICENSE).
+
+## Run a real PPO pilot in GitHub Actions (no local installation)
+
+1. Open [Actions → PPO pilot experiment](https://github.com/andrea-bianco00/geometry-survivor-rl/actions/workflows/train-ppo.yml).
+2. Select **Run workflow**, choose the default **30,000 timesteps**, **50 evaluation seeds**, and **training seed 42**, then confirm.
+3. Wait for the job to finish. The run summary contains measured mean, median and p90 survival for **random**, **non-learning heuristic**, and **trained PPO**, evaluated on identical held-out game seeds.
+4. Download the run's `ppo-pilot-<run-id>` artifact for the trained model (`.zip`), per-episode CSV files and Markdown summary. Artifacts are retained for 30 days; they are not automatically committed to the repository.
+
+**Scientific caution:** 30,000 steps is a *smoke-test/pilot*, not evidence of a good policy. If PPO underperforms, report that honestly and improve training. The job reruns the simulator parity suite before training. This workflow is manually triggered to avoid consuming GitHub Actions minutes on every commit.
